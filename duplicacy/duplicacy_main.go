@@ -683,7 +683,10 @@ func backupRepository(context *cli.Context) {
 		return
 	}
 
-	runScript(context, preference.Name, "pre")
+	if !runScript(context, preference.Name, "pre") {
+		duplicacy.LOG_ERROR("BACKUP_ABORTED", "Backup aborted because of error in pre script.")
+		os.Exit(2)
+	}
 
 	threads := context.Int("threads")
 	if threads < 1 {
