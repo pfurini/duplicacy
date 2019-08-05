@@ -24,7 +24,7 @@ import (
 
 	"io/ioutil"
 
-	"github.com/gilbertchen/duplicacy/src"
+	duplicacy "github.com/gilbertchen/duplicacy/src"
 )
 
 const (
@@ -684,7 +684,8 @@ func backupRepository(context *cli.Context) {
 	}
 
 	if !runScript(context, preference.Name, "pre") {
-		duplicacy.LOG_ERROR("BACKUP_ABORTED", "Backup aborted because of error in pre script.")
+		duplicacy.LOG_ERROR("BACKUP_ABORTED", "Backup aborted because of error in pre script. NOTE: Post script will run anyway.")
+		runScript(context, preference.Name, "post")
 		os.Exit(2)
 	}
 
@@ -786,8 +787,6 @@ func restoreRepository(context *cli.Context) {
 		}
 
 		patterns = append(patterns, pattern)
-
-	
 
 	}
 	patterns = duplicacy.ProcessFilterLines(patterns, make([]string, 0))
@@ -1300,7 +1299,7 @@ func benchmark(context *cli.Context) {
 	if storage == nil {
 		return
 	}
-	duplicacy.Benchmark(repository, storage, int64(fileSize) * 1024 * 1024, chunkSize * 1024 * 1024, chunkCount, uploadThreads, downloadThreads)
+	duplicacy.Benchmark(repository, storage, int64(fileSize)*1024*1024, chunkSize*1024*1024, chunkCount, uploadThreads, downloadThreads)
 }
 
 func main() {
