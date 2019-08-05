@@ -683,50 +683,51 @@ func backupRepository(context *cli.Context) {
 		return
 	}
 
-	if !runScript(context, preference.Name, "pre") {
-		duplicacy.LOG_ERROR("BACKUP_ABORTED", "Backup aborted because of error in pre script. NOTE: Post script will run anyway.")
-		runScript(context, preference.Name, "post")
-		os.Exit(2)
+	preScriptSuccess := runScript(context, preference.Name, "pre")
+	if preScriptSuccess {
+		threads := context.Int("threads")
+		if threads < 1 {
+			threads = 1
+		}
+
+		duplicacy.LOG_INFO("STORAGE_SET", "Storage set to %s", preference.StorageURL)
+		storage := duplicacy.CreateStorage(*preference, false, threads)
+		if storage == nil {
+			return
+		}
+
+		password := ""
+		if preference.Encrypted {
+			password = duplicacy.GetPassword(*preference, "password", "Enter storage password:", false, false)
+		}
+
+		quickMode := true
+		if context.Bool("hash") {
+			quickMode = false
+		}
+
+		showStatistics := context.Bool("stats")
+
+		enableVSS := context.Bool("vss")
+		vssTimeout := context.Int("vss-timeout")
+
+		dryRun := context.Bool("dry-run")
+		uploadRateLimit := context.Int("limit-rate")
+		enumOnly := context.Bool("enum-only")
+		storage.SetRateLimits(0, uploadRateLimit)
+		backupManager := duplicacy.CreateBackupManager(preference.SnapshotID, storage, repository, password, preference.NobackupFile)
+		duplicacy.SavePassword(*preference, "password", password)
+
+		backupManager.SetupSnapshotCache(preference.Name)
+		backupManager.SetDryRun(dryRun)
+		backupManager.Backup(repository, quickMode, threads, context.String("t"), showStatistics, enableVSS, vssTimeout, enumOnly)
 	}
-
-	threads := context.Int("threads")
-	if threads < 1 {
-		threads = 1
-	}
-
-	duplicacy.LOG_INFO("STORAGE_SET", "Storage set to %s", preference.StorageURL)
-	storage := duplicacy.CreateStorage(*preference, false, threads)
-	if storage == nil {
-		return
-	}
-
-	password := ""
-	if preference.Encrypted {
-		password = duplicacy.GetPassword(*preference, "password", "Enter storage password:", false, false)
-	}
-
-	quickMode := true
-	if context.Bool("hash") {
-		quickMode = false
-	}
-
-	showStatistics := context.Bool("stats")
-
-	enableVSS := context.Bool("vss")
-	vssTimeout := context.Int("vss-timeout")
-
-	dryRun := context.Bool("dry-run")
-	uploadRateLimit := context.Int("limit-rate")
-	enumOnly := context.Bool("enum-only")
-	storage.SetRateLimits(0, uploadRateLimit)
-	backupManager := duplicacy.CreateBackupManager(preference.SnapshotID, storage, repository, password, preference.NobackupFile)
-	duplicacy.SavePassword(*preference, "password", password)
-
-	backupManager.SetupSnapshotCache(preference.Name)
-	backupManager.SetDryRun(dryRun)
-	backupManager.Backup(repository, quickMode, threads, context.String("t"), showStatistics, enableVSS, vssTimeout, enumOnly)
 
 	runScript(context, preference.Name, "post")
+	
+	if !preScriptSuccess {
+		duplicacy.LOG_ERROR("BACKUP_ABORTED", "Backup aborted because of error in pre script. NOTE: Post script has been executed anyway.")
+	}
 }
 
 func restoreRepository(context *cli.Context) {
